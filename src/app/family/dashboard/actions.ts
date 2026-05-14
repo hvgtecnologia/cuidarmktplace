@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 
 export const searchCaregiversAction = createSafeAction(
   caregiverSearchSchema,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async (filters, _userId) => {
     const supabase = createClient()
 

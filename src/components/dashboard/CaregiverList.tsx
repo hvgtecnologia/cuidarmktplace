@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { searchCaregiversAction } from '@/app/family/dashboard/actions'
 import {
   CARE_TAGS,
-  SCHEDULES,
   CAREGIVER_LEVELS,
   SERVICE_MODALITIES,
 } from '@/constants/care-tags'
@@ -111,7 +110,7 @@ export function CaregiverList() {
     fetchCaregivers(filters)
   }, [filters, fetchCaregivers])
 
-  const handle = <K extends keyof CaregiverSearchFilters>(key: K, value: CaregiverSearchFilters[K] | string) => {
+  const handle = (key: keyof CaregiverSearchFilters, value: string | number | undefined) => {
     setFilters((prev) => ({
       ...prev,
       [key]: value === 'all' || value === '' ? (key === 'maxPrice' ? undefined : '') : value,

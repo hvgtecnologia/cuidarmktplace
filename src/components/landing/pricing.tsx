@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Icons, type IconKey } from '@/components/icons'
-import { cn } from '@/lib/utils'
 
 type Tier = {
   modality: string

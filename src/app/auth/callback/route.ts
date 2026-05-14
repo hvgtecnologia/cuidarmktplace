@@ -1,19 +1,26 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
+function dashboardForRole(role?: string | null) {
+  switch (role) {
+    case 'admin':     return '/admin'
+    case 'caregiver': return '/caregiver/dashboard'
+    case 'family':
+    default:          return '/family/dashboard'
+  }
+}
+
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  // if "next" is in search params, use it as the redirection URL
-  const next = searchParams.get('next') ?? '/dashboard'
+  const explicitNext = searchParams.get('next')
 
   if (code) {
     const supabase = createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
       const { data: { user } } = await supabase.auth.getUser()
-      
-      // Check if user has a profile/role
+
       const { data: profile } = await supabase
         .from('profiles')
         .select('role')
@@ -21,14 +28,13 @@ export async function GET(request: Request) {
         .single()
 
       if (!profile) {
-        // If no profile, they might need onboarding
         return NextResponse.redirect(`${origin}/register`)
       }
 
-      const forwardedHost = request.headers.get('x-forwarded-host') // i.e. vercel.com
+      const next = explicitNext || dashboardForRole(profile.role)
+      const forwardedHost = request.headers.get('x-forwarded-host')
       const isLocalEnv = process.env.NODE_ENV === 'development'
       if (isLocalEnv) {
-        // we can be sure that origin is http://localhost:3000
         return NextResponse.redirect(`${origin}${next}`)
       } else if (forwardedHost) {
         return NextResponse.redirect(`https://${forwardedHost}${next}`)
@@ -38,6 +44,5 @@ export async function GET(request: Request) {
     }
   }
 
-  // return the user to an error page with instructions
   return NextResponse.redirect(`${origin}/auth/auth-code-error`)
 }

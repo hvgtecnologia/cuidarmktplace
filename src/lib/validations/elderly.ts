@@ -17,11 +17,13 @@ export const elderlyProfileSchema = z.object({
 
   observations: z.string().max(1000, { message: 'Máximo de 1000 caracteres.' }).optional(),
 
-  has_stairs: z.boolean().default(false),
-  has_ramp: z.boolean().default(false),
-  has_adapted_bathroom: z.boolean().default(false),
-  has_caregiver_room: z.boolean().default(false),
-  has_pets: z.boolean().default(false),
+  // Sem .default() para evitar drift entre z.input e z.output —
+  // o form fornece false via defaultValues.
+  has_stairs: z.boolean(),
+  has_ramp: z.boolean(),
+  has_adapted_bathroom: z.boolean(),
+  has_caregiver_room: z.boolean(),
+  has_pets: z.boolean(),
   residence_notes: z.string().max(500, { message: 'Máximo de 500 caracteres.' }).optional(),
 })
 

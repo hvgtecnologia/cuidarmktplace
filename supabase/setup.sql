@@ -74,6 +74,16 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+-- Migrations: add columns if upgrading from an older schema
+DO $$ BEGIN
+  -- Convert legacy text "role" to enum if needed
+  BEGIN
+    ALTER TABLE public.profiles ALTER COLUMN role TYPE user_role USING role::user_role;
+  EXCEPTION WHEN others THEN NULL; END;
+END $$;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS bio_short text;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS onboarded boolean NOT NULL DEFAULT false;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_active boolean NOT NULL DEFAULT true;
 CREATE INDEX IF NOT EXISTS profiles_role_idx ON public.profiles(role);
 
 DROP TRIGGER IF EXISTS profiles_set_updated_at ON public.profiles;
@@ -130,6 +140,21 @@ CREATE TABLE IF NOT EXISTS public.caregiver_profiles (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+-- Migrations: add columns if upgrading from an older schema
+ALTER TABLE public.caregiver_profiles ADD COLUMN IF NOT EXISTS level caregiver_level NOT NULL DEFAULT 'basic';
+ALTER TABLE public.caregiver_profiles ADD COLUMN IF NOT EXISTS coren_number text;
+ALTER TABLE public.caregiver_profiles ADD COLUMN IF NOT EXISTS half_day_rate numeric(10, 2);
+ALTER TABLE public.caregiver_profiles ADD COLUMN IF NOT EXISTS day_shift_rate numeric(10, 2);
+ALTER TABLE public.caregiver_profiles ADD COLUMN IF NOT EXISTS night_shift_rate numeric(10, 2);
+ALTER TABLE public.caregiver_profiles ADD COLUMN IF NOT EXISTS overnight_rate numeric(10, 2);
+ALTER TABLE public.caregiver_profiles ADD COLUMN IF NOT EXISTS full_24h_rate numeric(10, 2);
+ALTER TABLE public.caregiver_profiles ADD COLUMN IF NOT EXISTS monthly_rate numeric(10, 2);
+ALTER TABLE public.caregiver_profiles ADD COLUMN IF NOT EXISTS offered_modalities text[] NOT NULL DEFAULT ARRAY[]::text[];
+ALTER TABLE public.caregiver_profiles ADD COLUMN IF NOT EXISTS jobs_completed integer NOT NULL DEFAULT 0;
+ALTER TABLE public.caregiver_profiles ADD COLUMN IF NOT EXISTS response_time_minutes integer;
+ALTER TABLE public.caregiver_profiles ADD COLUMN IF NOT EXISTS background_check_at timestamptz;
+ALTER TABLE public.caregiver_profiles ADD COLUMN IF NOT EXISTS is_featured boolean NOT NULL DEFAULT false;
+
 CREATE INDEX IF NOT EXISTS caregiver_profiles_specialties_idx ON public.caregiver_profiles USING GIN (specialties);
 CREATE INDEX IF NOT EXISTS caregiver_profiles_shifts_idx ON public.caregiver_profiles USING GIN (available_shifts);
 CREATE INDEX IF NOT EXISTS caregiver_profiles_modalities_idx ON public.caregiver_profiles USING GIN (offered_modalities);

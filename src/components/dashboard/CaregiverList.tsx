@@ -110,10 +110,10 @@ export function CaregiverList() {
     fetchCaregivers(filters)
   }, [filters, fetchCaregivers])
 
-  const handle = (key: keyof CaregiverSearchFilters, value: string | number | undefined) => {
+  const handle = (key: keyof CaregiverSearchFilters, value: string | number | null | undefined) => {
     setFilters((prev) => ({
       ...prev,
-      [key]: value === 'all' || value === '' ? (key === 'maxPrice' ? undefined : '') : value,
+      [key]: value == null || value === 'all' || value === '' ? (key === 'maxPrice' ? undefined : '') : value,
     }))
   }
 

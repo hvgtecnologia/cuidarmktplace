@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Icons } from '@/components/icons'
 import { MatchActions } from './MatchActions'
+import { UserMenu } from '@/components/site/user-menu'
 
 export const metadata = {
   title: 'Minhas oportunidades · Cuidador',
@@ -76,9 +77,12 @@ export default async function CaregiverDashboardPage() {
             <button className="w-9 h-9 grid place-items-center rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground" aria-label="Notificações">
               <Icons.bell className="w-4 h-4" />
             </button>
-            <div className="w-9 h-9 rounded-full gradient-primary text-white grid place-items-center text-sm font-bold">
-              {firstName.charAt(0).toUpperCase()}
-            </div>
+            <UserMenu
+              fullName={profile?.full_name || 'Cuidador'}
+              avatarUrl={profile?.avatar_url}
+              email={user.email}
+              role="caregiver"
+            />
           </div>
         </div>
       </header>

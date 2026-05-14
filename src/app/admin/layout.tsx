@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { Icons } from '@/components/icons'
+import { UserMenu } from '@/components/site/user-menu'
 
 const NAV = [
   { href: '/admin', label: 'Visão geral', icon: 'sparkles' as const },
@@ -20,7 +21,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, full_name')
+    .select('role, full_name, avatar_url')
     .eq('id', user.id)
     .single()
 
@@ -60,20 +61,33 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           })}
         </nav>
 
-        <div className="p-4 border-t border-border">
-          <div className="flex items-center gap-3 px-2">
-            <div className="w-9 h-9 rounded-full gradient-primary text-white grid place-items-center text-sm font-bold flex-shrink-0">
-              {profile?.full_name?.charAt(0).toUpperCase() || 'A'}
-            </div>
-            <div className="min-w-0">
-              <div className="text-sm font-semibold truncate">{profile?.full_name}</div>
-              <div className="text-xs text-muted-foreground">Administrador</div>
-            </div>
-          </div>
+        <div className="p-3 border-t border-border">
+          <UserMenu
+            fullName={profile?.full_name || 'Admin'}
+            avatarUrl={profile?.avatar_url}
+            email={user.email}
+            role="admin"
+          />
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto">{children}</main>
+      <main className="flex-1 overflow-auto">
+        <div className="lg:hidden sticky top-0 z-30 bg-background/80 backdrop-blur-xl border-b border-border flex items-center justify-between px-4 h-14">
+          <Link href="/admin" className="flex items-center gap-2">
+            <span className="grid place-items-center w-8 h-8 rounded-lg gradient-primary text-white">
+              <Icons.logo className="w-4 h-4" />
+            </span>
+            <span className="text-sm font-bold">Cuide+ Admin</span>
+          </Link>
+          <UserMenu
+            fullName={profile?.full_name || 'Admin'}
+            avatarUrl={profile?.avatar_url}
+            email={user.email}
+            role="admin"
+          />
+        </div>
+        {children}
+      </main>
     </div>
   )
 }

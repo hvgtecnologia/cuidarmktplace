@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Icons } from '@/components/icons'
+import { UserMenu } from '@/components/site/user-menu'
 
 export const metadata = {
   title: 'Meus convites · Família',
@@ -34,6 +35,12 @@ export default async function FamilyMatchesPage() {
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name, avatar_url')
+    .eq('id', user.id)
+    .single()
 
   const { data: matches } = await supabase
     .from('matches')
@@ -70,12 +77,12 @@ export default async function FamilyMatchesPage() {
           <Link href="/family/dashboard" className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
             <Icons.arrowRight className="w-4 h-4 rotate-180" /> Buscar mais cuidadores
           </Link>
-          <Link href="/" className="flex items-center gap-2">
-            <span className="grid place-items-center w-9 h-9 rounded-xl gradient-primary text-white">
-              <Icons.logo className="w-5 h-5" />
-            </span>
-            <span className="text-lg font-bold">Cuide<span className="text-primary">+</span></span>
-          </Link>
+          <UserMenu
+            fullName={profile?.full_name || 'Família'}
+            avatarUrl={profile?.avatar_url}
+            email={user.email}
+            role="family"
+          />
         </div>
       </header>
 

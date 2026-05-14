@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { CaregiverList } from '@/components/dashboard/CaregiverList'
 import { Icons } from '@/components/icons'
 import { Button } from '@/components/ui/button'
+import { UserMenu } from '@/components/site/user-menu'
 
 export const metadata = {
   title: 'Encontre cuidadores',
@@ -18,7 +19,7 @@ export default async function FamilyDashboardPage() {
 
   const { data: familyObj } = await supabase
     .from('profiles')
-    .select('full_name')
+    .select('full_name, avatar_url')
     .eq('id', user.id)
     .single()
 
@@ -46,9 +47,12 @@ export default async function FamilyDashboardPage() {
             <button className="w-9 h-9 grid place-items-center rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" aria-label="Notificações">
               <Icons.bell className="w-4 h-4" />
             </button>
-            <div className="w-9 h-9 rounded-full gradient-primary text-white grid place-items-center text-sm font-bold">
-              {firstName.charAt(0).toUpperCase()}
-            </div>
+            <UserMenu
+              fullName={familyObj?.full_name || 'Família'}
+              avatarUrl={familyObj?.avatar_url}
+              email={user.email}
+              role="family"
+            />
           </div>
         </div>
       </header>

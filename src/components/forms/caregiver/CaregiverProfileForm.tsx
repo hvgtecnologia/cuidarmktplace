@@ -167,7 +167,17 @@ export function CaregiverProfileForm({ initialData, verificationStatus }: Caregi
                 <FormItem>
                   <FormLabel>Valor por Hora (R$)</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="Ex: 25.00" {...field} />
+                    <Input
+                      type="number"
+                      placeholder="Ex: 25.00"
+                      step="0.01"
+                      {...field}
+                      value={field.value ?? ''}
+                      onChange={(e) => {
+                        const v = e.target.value
+                        field.onChange(v === '' ? undefined : Number(v))
+                      }}
+                    />
                   </FormControl>
                   <FormDescription>As famílias verão este valor como referência ao fechar negócio com você.</FormDescription>
                   <FormMessage />

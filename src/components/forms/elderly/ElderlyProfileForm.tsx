@@ -119,13 +119,22 @@ export function ElderlyProfileForm({ initialData, elderlyId }: ElderlyProfileFor
                     <FormItem>
                       <FormLabel>Idade</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="Ex: 82" {...field} />
+                        <Input
+                          type="number"
+                          placeholder="Ex: 82"
+                          {...field}
+                          value={field.value ?? ''}
+                          onChange={(e) => {
+                            const v = e.target.value
+                            field.onChange(v === '' ? undefined : Number(v))
+                          }}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={form.control}
                   name="sex"

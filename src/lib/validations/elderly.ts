@@ -1,26 +1,28 @@
-import * as z from 'zod';
+import * as z from 'zod'
 
 export const elderlyProfileSchema = z.object({
   name: z.string().min(2, { message: 'Nome deve ter pelo menos 2 caracteres.' }),
-  age: z.coerce.number().min(1, { message: 'Idade inválida.' }).max(130, { message: 'Idade inválida.' }),
-  sex: z.enum(['M', 'F', 'outro'], { required_error: 'Selecione o sexo.' }),
+  age: z
+    .number({ message: 'Informe a idade.' })
+    .min(1, { message: 'Idade inválida.' })
+    .max(130, { message: 'Idade inválida.' }),
+  sex: z.enum(['M', 'F', 'outro'], { message: 'Selecione o sexo.' }),
   photo_url: z.string().url({ message: 'URL da foto inválida.' }).optional().or(z.literal('')),
-  
+
   city: z.string().min(2, { message: 'Informe a cidade.' }),
   neighborhood: z.string().min(2, { message: 'Informe o bairro.' }),
-  
+
   care_needs: z.array(z.string()).min(1, { message: 'Selecione pelo menos uma necessidade.' }),
   preferred_schedule: z.array(z.string()).min(1, { message: 'Selecione pelo menos uma preferência de horário.' }),
-  
+
   observations: z.string().max(1000, { message: 'Máximo de 1000 caracteres.' }).optional(),
-  
-  // Avaliação da residência
+
   has_stairs: z.boolean().default(false),
   has_ramp: z.boolean().default(false),
   has_adapted_bathroom: z.boolean().default(false),
   has_caregiver_room: z.boolean().default(false),
   has_pets: z.boolean().default(false),
   residence_notes: z.string().max(500, { message: 'Máximo de 500 caracteres.' }).optional(),
-});
+})
 
-export type ElderlyProfileFormValues = z.infer<typeof elderlyProfileSchema>;
+export type ElderlyProfileFormValues = z.infer<typeof elderlyProfileSchema>

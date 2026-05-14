@@ -25,4 +25,8 @@ export const elderlyProfileSchema = z.object({
   residence_notes: z.string().max(500, { message: 'Máximo de 500 caracteres.' }).optional(),
 })
 
-export type ElderlyProfileFormValues = z.infer<typeof elderlyProfileSchema>
+// IMPORTANTE: usamos z.input (não z.infer) porque o react-hook-form trabalha
+// com a forma de ENTRADA do schema (antes de defaults/coerce serem aplicados).
+// @hookform/resolvers v5 + zod v4 são estritos quanto a isso.
+export type ElderlyProfileFormValues = z.input<typeof elderlyProfileSchema>
+export type ElderlyProfileParsed = z.output<typeof elderlyProfileSchema>

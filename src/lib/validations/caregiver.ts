@@ -14,4 +14,9 @@ export const caregiverProfileSchema = z.object({
   available_shifts: z.array(z.string()).min(1, { message: 'Selecione os turnos em que está disponível.' }),
 })
 
-export type CaregiverProfileFormValues = z.infer<typeof caregiverProfileSchema>
+// IMPORTANTE: usamos z.input (não z.infer) porque o react-hook-form trabalha
+// com a forma de ENTRADA do schema (antes de defaults/coerce serem aplicados).
+// z.infer = z.output (depois do parse). z.input = antes do parse.
+// @hookform/resolvers v5 + zod v4 são estritos quanto a isso.
+export type CaregiverProfileFormValues = z.input<typeof caregiverProfileSchema>
+export type CaregiverProfileParsed = z.output<typeof caregiverProfileSchema>

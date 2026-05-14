@@ -23,10 +23,11 @@ export function createSafeAction<TInput, TOutput>(
       
       // Allow handlers to return a specific business error structure without throwing
       if (result && typeof result === 'object' && '_action_business_error' in result) {
-        return { 
-          success: false, 
-          error: result.internalMsg || 'Operação não permitida.',
-          code: result._action_business_error 
+        const biz = result as { _action_business_error: string; internalMsg?: string }
+        return {
+          success: false,
+          error: biz.internalMsg || 'Operação não permitida.',
+          code: biz._action_business_error,
         };
       }
       

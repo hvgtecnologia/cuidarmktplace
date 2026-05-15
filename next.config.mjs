@@ -1,3 +1,10 @@
+import { existsSync } from 'node:fs'
+
+// Cache local de node_modules fora do Dropbox (apenas no Mac do dev).
+// Se não existir, é ignorado — Vercel/Linux usam apenas o node_modules padrão.
+const LOCAL_NODE_MODULES_CACHE = '/Users/hamiltonvinicius/dev_cache/cuidemais/node_modules'
+const useLocalCache = existsSync(LOCAL_NODE_MODULES_CACHE)
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Não trave o build da Vercel por warnings cosméticos.
@@ -33,6 +40,13 @@ const nextConfig = {
         ],
       },
     ]
+  },
+  webpack(config) {
+    if (useLocalCache) {
+      // Dev local: prioriza o cache fora do Dropbox para evitar conflitos de sync.
+      config.resolve.modules = [LOCAL_NODE_MODULES_CACHE, 'node_modules']
+    }
+    return config
   },
 }
 

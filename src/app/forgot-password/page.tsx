@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Icons } from '@/components/icons'
 import { toast } from 'sonner'
+import { requestPasswordReset } from '@/server/actions/auth.actions'
 
 export default function ForgotPasswordPage() {
   const [isLoading, setIsLoading] = useState(false)
@@ -18,13 +19,9 @@ export default function ForgotPasswordPage() {
     try {
       const formData = new FormData(e.currentTarget)
       const email = formData.get('email') as string
-      const { createClient } = await import('@/lib/supabase/client')
-      const supabase = createClient()
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback?next=/family/dashboard`,
-      })
-      if (error) {
-        toast.error(error.message)
+      const res = await requestPasswordReset(email)
+      if (res?.error) {
+        toast.error(res.error)
       } else {
         setSent(true)
       }

@@ -1,22 +1,10 @@
-import { createClient } from '@/lib/supabase/server'
+import * as reviews from '@/server/domain/reviews/reviews.repository'
 import { Icons } from '@/components/icons'
 
 export const metadata = { title: 'Avaliações · Admin' }
 
 export default async function AdminReviewsPage() {
-  const supabase = createClient()
-
-  const { data: reviews } = await supabase
-    .from('reviews')
-    .select(`
-      id, rating, comment, created_at,
-      reviewer:profiles!reviews_reviewer_id_fkey(full_name),
-      caregiver:profiles!reviews_caregiver_id_fkey(full_name)
-    `)
-    .order('created_at', { ascending: false })
-    .limit(50)
-
-  const items = reviews || []
+  const items = (await reviews.findAllForAdmin(100)) ?? []
   const avg = items.length > 0 ? items.reduce((s, r) => s + (r.rating || 0), 0) / items.length : 0
   const distribution = [5, 4, 3, 2, 1].map((star) => ({
     star,

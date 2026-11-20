@@ -26,6 +26,7 @@ import {
   BadgeCheck,
   GraduationCap,
   HandHeart,
+  Send,
   type LucideProps,
 } from "lucide-react"
 
@@ -83,6 +84,7 @@ export const Icons = {
   verified: BadgeCheck,
   graduation: GraduationCap,
   handHeart: HandHeart,
+  send: Send,
 }
 
 export type IconKey = keyof typeof Icons

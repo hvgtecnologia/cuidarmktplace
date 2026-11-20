@@ -1,14 +1,6 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@/server/db/server-client'
 import { NextResponse } from 'next/server'
-
-function dashboardForRole(role?: string | null) {
-  switch (role) {
-    case 'admin':     return '/admin'
-    case 'caregiver': return '/caregiver/dashboard'
-    case 'family':
-    default:          return '/family/dashboard'
-  }
-}
+import { dashboardForRole } from '@/server/http/guards'
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)

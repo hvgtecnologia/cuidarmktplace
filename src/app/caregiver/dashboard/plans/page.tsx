@@ -1,115 +1,81 @@
-'use client'
-
-import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card'
+import Link from 'next/link'
+import { listProducts, paymentProviderRequiresDocument } from '@/server/domain/payments/payments.service'
+import { findByUser } from '@/server/domain/subscriptions/subscriptions.repository'
+import { requireRole } from '@/server/http/guards'
+import { CheckoutPanel } from '@/components/payments/CheckoutPanel'
 import { Button } from '@/components/ui/button'
-import { Check, ShieldCheck, Zap } from 'lucide-react'
-import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
-import { simulateCheckoutAction } from '@/app/actions/payment'
+import { Badge } from '@/components/ui/badge'
+import { Icons } from '@/components/icons'
 
-export default function PlansPage() {
-  const router = useRouter()
-  const [isLoading, setIsLoading] = useState(false)
+export const metadata = {
+  title: 'Meu plano · Cuidador',
+  description: 'Assine para aceitar convites de famílias.',
+}
 
-  const handleSubscribe = async (plan: string) => {
-    setIsLoading(true)
-    toast.loading('Iniciando pagamento seguro...', { id: 'payment' })
-    
-    // Simulating API call to Asaas Checkout / Payment Link Generation
-    setTimeout(async () => {
-      const res = await simulateCheckoutAction({ planCode: plan })
-      if (res.success) {
-        toast.success('Assinatura ativada com sucesso! Vagas liberadas.', { id: 'payment' })
-        router.push('/family/dashboard')
-        router.refresh()
-      } else {
-        toast.error('Erro ao processar assinatura', { id: 'payment' })
-        setIsLoading(false)
-      }
-    }, 1500)
-  }
+export default async function PlansPage() {
+  const user = await requireRole(['caregiver'])
+
+  const [products, subscription] = await Promise.all([
+    // Preços vêm do catálogo no banco — a tela não sabe valor nenhum.
+    listProducts().catch(() => []),
+    findByUser(user.id),
+  ])
+
+  const isActive =
+    subscription?.status === 'active' &&
+    (!subscription.current_period_end || new Date(subscription.current_period_end) > new Date())
+
+  // Taxa por match é cobrança avulsa, não assinatura: fora desta tela.
+  const plans = (products ?? []).filter((p) => p.grants_plan !== null)
+  const needsDocument = paymentProviderRequiresDocument() && !user.document
 
   return (
-    <div className="container max-w-5xl py-16 px-4 mx-auto min-h-screen">
-      <div className="text-center mb-16">
-        <h1 className="text-4xl font-extrabold tracking-tight text-primary mb-4">Escolha seu Plano</h1>
-        <p className="text-muted-foreground text-xl max-w-2xl mx-auto">
-          Para ter acesso à comunicação direta com todos os nossos cuidadores verificados, escolha como deseja assinar.
+    <div className="container max-w-5xl py-14 px-4 mx-auto min-h-screen">
+      <div className="text-center mb-10">
+        <h1 className="text-display-md">Meu plano</h1>
+        <p className="text-muted-foreground text-lg mt-2 max-w-xl mx-auto">
+          Com plano ativo você aceita convites de famílias e libera o contato direto.
         </p>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-         {/* PLANO MENSAL */}
-         <Card className="border-2 border-muted bg-white shadow-sm flex flex-col relative overflow-hidden transition-all hover:border-primary/30 hover:shadow-md">
-            <CardHeader className="text-center pb-2">
-              <CardTitle className="text-2xl font-bold">Mensal</CardTitle>
-              <CardDescription>Para necessidades rápidas</CardDescription>
-            </CardHeader>
-            <CardContent className="flex-1 text-center">
-               <div className="my-6">
-                 <span className="text-5xl font-extrabold">R$ 99</span>
-                 <span className="text-muted-foreground font-medium">/mês</span>
-               </div>
-               <ul className="space-y-3 text-left max-w-xs mx-auto">
-                 <li className="flex items-center gap-3"><Check className="h-5 w-5 text-emerald-500" /> Acesso ilimitado ao sistema de Matches</li>
-                 <li className="flex items-center gap-3"><Check className="h-5 w-5 text-emerald-500" /> Cuidadores 100% verificados</li>
-                 <li className="flex items-center gap-3"><Check className="h-5 w-5 text-emerald-500" /> Suporte humanizado</li>
-                 <li className="flex items-center gap-3"><Check className="h-5 w-5 text-emerald-500" /> Cancele quando quiser</li>
-               </ul>
-            </CardContent>
-            <CardFooter>
-              <Button 
-                variant="outline" 
-                size="lg" 
-                className="w-full text-lg h-14" 
-                disabled={isLoading} 
-                onClick={() => handleSubscribe('monthly')}
-              >
-                Assinar Mensal
-              </Button>
-            </CardFooter>
-         </Card>
+      {isActive && (
+        <div className="mb-10 max-w-md mx-auto bg-secondary/10 border border-secondary/30 rounded-2xl p-5 text-center">
+          <Badge className="bg-secondary text-secondary-foreground mb-2">
+            <Icons.verified className="w-3 h-3 mr-1" /> Plano ativo
+          </Badge>
+          <p className="text-sm">
+            Seu plano <strong>{subscription?.plan}</strong> vale até{' '}
+            {subscription?.current_period_end
+              ? new Date(subscription.current_period_end).toLocaleDateString('pt-BR')
+              : '—'}
+            .
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Pagar de novo soma ao tempo que ainda resta.
+          </p>
+        </div>
+      )}
 
-         {/* PLANO TRIMESTRAL */}
-         <Card className="border-2 border-primary bg-primary/5 shadow-lg flex flex-col relative overflow-hidden transform md:-translate-y-4">
-            <div className="absolute top-0 inset-x-0 h-1.5 bg-primary"></div>
-            <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-bl-lg">
-              MAIS POPULAR
-            </div>
-            
-            <CardHeader className="text-center pb-2 mt-4">
-              <CardTitle className="text-2xl font-bold text-primary flex items-center justify-center gap-2">
-                Trimestral <Zap className="w-5 h-5 fill-accent text-accent" />
-              </CardTitle>
-              <CardDescription>Melhor custo-benefício</CardDescription>
-            </CardHeader>
-            <CardContent className="flex-1 text-center">
-               <div className="my-6">
-                 <span className="text-5xl font-extrabold">R$ 79</span>
-                 <span className="text-muted-foreground font-medium">/mês</span>
-               </div>
-               <div className="text-sm font-semibold text-accent mb-6">Cobrado R$ 237 a cada 3 meses</div>
-               <ul className="space-y-3 text-left max-w-xs mx-auto">
-                 <li className="flex items-center gap-3"><Check className="h-5 w-5 text-emerald-500" /> Tudo do plano mensal</li>
-                 <li className="flex items-center gap-3"><Check className="h-5 w-5 text-emerald-500" /> Prioridade no suporte</li>
-                 <li className="flex items-center gap-3"><Check className="h-5 w-5 text-emerald-500" /> Selo &quot;Família Premium&quot; no Card</li>
-                 <li className="flex items-center gap-3"><ShieldCheck className="h-5 w-5 text-emerald-500" /> Garantia de substituição em 48h</li>
-               </ul>
-            </CardContent>
-            <CardFooter>
-              <Button 
-                variant="default" 
-                size="lg" 
-                className="w-full text-lg h-14 shadow-md hover:scale-[1.02] transition-transform" 
-                disabled={isLoading} 
-                onClick={() => handleSubscribe('quarterly')}
-              >
-                Assinar Trimestral
-              </Button>
-            </CardFooter>
-         </Card>
-      </div>
+      {plans.length === 0 ? (
+        <div className="max-w-md mx-auto bg-card border border-dashed border-border rounded-2xl p-8 text-center">
+          <p className="font-semibold">Nenhum plano disponível.</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            O catálogo <code>payment_products</code> está vazio ou o SQL ainda não foi aplicado.
+          </p>
+        </div>
+      ) : needsDocument ? (
+        <div className="max-w-md mx-auto bg-amber-50 border border-amber-200 rounded-2xl p-6 text-center">
+          <p className="font-semibold">Falta seu CPF/CNPJ</p>
+          <p className="text-sm text-muted-foreground mt-1 mb-4">
+            O provedor de pagamento exige isso para gerar a cobrança.
+          </p>
+          <Link href="/profile">
+            <Button variant="outline">Preencher em Minha conta</Button>
+          </Link>
+        </div>
+      ) : (
+        <CheckoutPanel products={plans} />
+      )}
     </div>
   )
 }

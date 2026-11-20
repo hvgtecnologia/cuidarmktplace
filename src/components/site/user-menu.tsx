@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { Icons, type IconKey } from '@/components/icons'
-import { signOut } from '@/app/actions'
+import { signOut } from '@/server/actions/auth.actions'
 import { cn } from '@/lib/utils'
 
 type Role = 'family' | 'caregiver' | 'admin'
@@ -16,20 +16,36 @@ type MenuItem = {
   onClick?: () => void | Promise<void>
 }
 
-const SECTIONS_BY_ROLE: Record<Role, { label: string; items: MenuItem[] }[]> = {
+type Section = {
+  label: string
+  /**
+   * 'nav'     → atalhos de navegação
+   * 'account' → dados da conta, suporte
+   *
+   * Onde já existe sidebar (admin no desktop), o layout passa
+   * showNavigation={false} e só as seções 'account' aparecem — senão o menu
+   * vira uma cópia da sidebar que está logo acima dele.
+   */
+  kind: 'nav' | 'account'
+  items: MenuItem[]
+}
+
+const SECTIONS_BY_ROLE: Record<Role, Section[]> = {
   family: [
     {
       label: 'Cuidados',
+      kind: 'nav',
       items: [
         { href: '/family/dashboard', label: 'Buscar cuidadores', icon: 'search' },
-        { href: '/family/dashboard/matches', label: 'Meus convites', icon: 'heart' },
+        { href: '/family/dashboard/matches', label: 'Meus convites', icon: 'chat' },
         { href: '/family/elderly/new', label: 'Cadastrar idoso', icon: 'handHeart' },
       ],
     },
     {
       label: 'Conta',
+      kind: 'account',
       items: [
-        { href: '/family/dashboard', label: 'Editar meu perfil', icon: 'users' },
+        { href: '/profile', label: 'Minha conta', icon: 'users' },
         { href: '/contato', label: 'Suporte', icon: 'chat' },
       ],
     },
@@ -37,15 +53,18 @@ const SECTIONS_BY_ROLE: Record<Role, { label: string; items: MenuItem[] }[]> = {
   caregiver: [
     {
       label: 'Trabalho',
+      kind: 'nav',
       items: [
-        { href: '/caregiver/dashboard', label: 'Meus convites', icon: 'bell' },
+        { href: '/caregiver/dashboard/matches', label: 'Meus convites', icon: 'chat' },
         { href: '/caregiver/profile', label: 'Editar perfil profissional', icon: 'stethoscope' },
         { href: '/caregiver/dashboard/plans', label: 'Meu plano', icon: 'sparkles' },
       ],
     },
     {
       label: 'Conta',
+      kind: 'account',
       items: [
+        { href: '/profile', label: 'Minha conta', icon: 'users' },
         { href: '/contato', label: 'Suporte', icon: 'chat' },
       ],
     },
@@ -53,12 +72,20 @@ const SECTIONS_BY_ROLE: Record<Role, { label: string; items: MenuItem[] }[]> = {
   admin: [
     {
       label: 'Operação',
+      kind: 'nav',
       items: [
         { href: '/admin', label: 'Visão geral', icon: 'sparkles' },
         { href: '/admin/caregivers', label: 'Cuidadores', icon: 'stethoscope' },
         { href: '/admin/families', label: 'Famílias', icon: 'handHeart' },
         { href: '/admin/bookings', label: 'Contratos', icon: 'calendar' },
         { href: '/admin/verification', label: 'Verificação', icon: 'shield' },
+      ],
+    },
+    {
+      label: 'Conta',
+      kind: 'account',
+      items: [
+        { href: '/profile', label: 'Minha conta', icon: 'users' },
       ],
     },
   ],
@@ -75,16 +102,30 @@ export function UserMenu({
   avatarUrl,
   role,
   email,
+  showNavigation = true,
 }: {
   fullName: string
   avatarUrl?: string | null
   role: Role
   email?: string | null
+  /** false quando o layout já tem navegação própria (sidebar do admin). */
+  showNavigation?: boolean
 }) {
   const [open, setOpen] = useState(false)
+  // Abre para cima quando não há espaço embaixo. Sem isto, o menu da sidebar
+  // do admin (que fica no rodapé de uma coluna min-h-screen) renderizava
+  // abaixo do viewport — parecia que o clique não fazia nada.
+  const [dropUp, setDropUp] = useState(false)
+  // Idem no eixo horizontal: o painel tem 288px e fica ancorado à direita do
+  // gatilho. Na sidebar do admin (256px de largura) isso joga a borda esquerda
+  // para fora da tela, cortando o texto dos itens.
+  const [alignStart, setAlignStart] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
   const initial = fullName.charAt(0).toUpperCase()
-  const sections = SECTIONS_BY_ROLE[role]
+  const sections = SECTIONS_BY_ROLE[role].filter(
+    (section) => showNavigation || section.kind === 'account'
+  )
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -101,11 +142,30 @@ export function UserMenu({
     }
   }, [])
 
+  const PANEL_WIDTH = 288 // w-72
+
+  function toggle() {
+    if (!open && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect()
+
+      // Vertical: ~340px é a altura típica do painel.
+      const spaceBelow = window.innerHeight - rect.bottom
+      setDropUp(spaceBelow < 340 && rect.top > spaceBelow)
+
+      // Horizontal: ancorado à direita, o painel se estende para a ESQUERDA a
+      // partir de rect.right. Se não couber, ancora à esquerda e deixa crescer
+      // para a direita (sobre o conteúdo principal).
+      setAlignStart(rect.right < PANEL_WIDTH)
+    }
+    setOpen((v) => !v)
+  }
+
   return (
     <div ref={ref} className="relative">
       <button
+        ref={triggerRef}
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggle}
         aria-label="Abrir menu do usuário"
         aria-expanded={open}
         className={cn(
@@ -138,7 +198,15 @@ export function UserMenu({
       {open && (
         <div
           role="menu"
-          className="absolute right-0 mt-2 w-72 origin-top-right rounded-2xl border border-border bg-card shadow-elevated overflow-hidden animate-fade-in z-50"
+          className={cn(
+            'absolute w-72 max-w-[calc(100vw-1rem)] rounded-2xl border border-border',
+            'bg-card shadow-elevated overflow-hidden animate-fade-in z-50',
+            alignStart ? 'left-0' : 'right-0',
+            dropUp ? 'bottom-full mb-2' : 'top-full mt-2',
+            dropUp
+              ? (alignStart ? 'origin-bottom-left' : 'origin-bottom-right')
+              : (alignStart ? 'origin-top-left' : 'origin-top-right')
+          )}
         >
           {/* Header */}
           <div className="px-4 py-4 bg-gradient-to-br from-primary/5 to-secondary/5 border-b border-border">

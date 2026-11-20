@@ -7,9 +7,9 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { PlusCircle, Info, ImagePlus } from 'lucide-react'
 
-import { caregiverProfileSchema, type CaregiverProfileFormValues } from '@/lib/validations/caregiver'
-import { updateCaregiverProfile } from '@/app/caregiver/profile/actions'
-import { CARE_TAGS, SCHEDULES } from '@/constants/care-tags'
+import { caregiverProfileSchema, type CaregiverProfileFormValues } from '@/server/validations/caregiver'
+import { updateCaregiverProfile } from '@/server/actions/caregiver.actions'
+import { CARE_TAGS, SCHEDULES, PROFESSIONAL_SERVICES, DRIVER_LICENSE_CATEGORIES } from '@/constants/care-tags'
 
 import { Button } from '@/components/ui/button'
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
@@ -48,6 +48,8 @@ export function CaregiverProfileForm({ initialData, verificationStatus }: Caregi
   const form = useForm<CaregiverProfileFormValues>({
     resolver: zodResolver(caregiverProfileSchema),
     defaultValues: {
+      // Perfis criados antes do multi-serviço são cuidadores por definição.
+      services: initialData?.services?.length ? initialData.services : ['care'],
       bio: initialData?.bio || '',
       specialties: initialData?.specialties || [],
       hourly_rate: initialData?.hourly_rate || undefined,
@@ -56,8 +58,18 @@ export function CaregiverProfileForm({ initialData, verificationStatus }: Caregi
       service_radius_km: defaultSliderValue,
       available_days: initialData?.available_days || [],
       available_shifts: initialData?.available_shifts || [],
+      vehicle_model: initialData?.vehicle_model || '',
+      vehicle_year: initialData?.vehicle_year || undefined,
+      vehicle_accessible: initialData?.vehicle_accessible || false,
+      driver_license_category: initialData?.driver_license_category || '',
+      trip_rate: initialData?.trip_rate || undefined,
     },
   })
+
+  // Quais blocos do formulário aparecem depende das funções marcadas.
+  const services = form.watch('services') || []
+  const offersCare = services.includes('care')
+  const offersDriving = services.includes('driving')
 
   async function onSubmit(data: CaregiverProfileFormValues) {
     setIsSubmitting(true)
@@ -102,6 +114,56 @@ export function CaregiverProfileForm({ initialData, verificationStatus }: Caregi
         )}
 
         {/* Informações Básicas */}
+        <Card>
+          <CardHeader>
+            <CardTitle>O que você oferece</CardTitle>
+            <CardDescription>
+              Pode marcar mais de uma. As famílias filtram a busca por isso.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <FormField
+              control={form.control}
+              name="services"
+              render={({ field }) => (
+                <FormItem>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    {PROFESSIONAL_SERVICES.map((service) => {
+                      const isSelected = (field.value || []).includes(service.value)
+                      return (
+                        <button
+                          key={service.value}
+                          type="button"
+                          aria-pressed={isSelected}
+                          onClick={() => toggleTag(field, service.value)}
+                          className={`text-left rounded-xl border-2 p-4 transition-all ${
+                            isSelected
+                              ? 'border-primary bg-primary/5'
+                              : 'border-border hover:border-primary/40'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 font-semibold">
+                            <span
+                              className={`w-4 h-4 rounded grid place-items-center border-2 ${
+                                isSelected ? 'bg-primary border-primary text-white' : 'border-muted-foreground/40'
+                              }`}
+                            >
+                              {isSelected && <PlusCircle className="w-3 h-3 rotate-45" />}
+                            </span>
+                            {service.label}
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1.5">{service.description}</p>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle>Dados Profissionais</CardTitle>
@@ -154,18 +216,22 @@ export function CaregiverProfileForm({ initialData, verificationStatus }: Caregi
                       />
                     </div>
                   </FormControl>
-                  <FormDescription>Distância máxima que você está disposto(a) a se deslocar a partir do seu bairro.</FormDescription>
+                  <FormDescription>
+                    Distância máxima que você se desloca a partir do seu bairro.
+                    Vale para todos os serviços que você oferece.
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
+            {offersCare && (
             <FormField
               control={form.control}
               name="hourly_rate"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Valor por Hora (R$)</FormLabel>
+                  <FormLabel>Valor por Hora de cuidado (R$)</FormLabel>
                   <FormControl>
                     <Input
                       type="number"
@@ -184,6 +250,7 @@ export function CaregiverProfileForm({ initialData, verificationStatus }: Caregi
                 </FormItem>
               )}
             />
+            )}
 
             <FormField
               control={form.control}
@@ -207,12 +274,157 @@ export function CaregiverProfileForm({ initialData, verificationStatus }: Caregi
         </Card>
 
         {/* Especialidades e Disponibilidade */}
+        {offersDriving && (
         <Card>
           <CardHeader>
-            <CardTitle>Especialidades e Disponibilidade</CardTitle>
-            <CardDescription>Defina com o que você sabe lidar e quando pode trabalhar.</CardDescription>
+            <CardTitle>Seu veículo</CardTitle>
+            <CardDescription>
+              As famílias precisam saber em que o idoso vai ser transportado.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid sm:grid-cols-2 gap-6">
+              <FormField
+                control={form.control}
+                name="vehicle_model"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Modelo do veículo</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: Chevrolet Spin" {...field} value={field.value ?? ''} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="vehicle_year"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Ano</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="Ex: 2019"
+                        {...field}
+                        value={field.value ?? ''}
+                        onChange={(e) => {
+                          const v = e.target.value
+                          field.onChange(v === '' ? undefined : Number(v))
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-6">
+              <FormField
+                control={form.control}
+                name="driver_license_category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Categoria da CNH</FormLabel>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {DRIVER_LICENSE_CATEGORIES.map((cat) => {
+                        const isSelected = field.value === cat.value
+                        return (
+                          <Badge
+                            key={cat.value}
+                            render={<button type="button" />}
+                            aria-pressed={isSelected}
+                            variant={isSelected ? 'default' : 'outline'}
+                            className="cursor-pointer text-sm py-1.5 px-3"
+                            onClick={() => field.onChange(isSelected ? '' : cat.value)}
+                          >
+                            {cat.label}
+                          </Badge>
+                        )
+                      })}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="trip_rate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Valor por trajeto (R$)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="Ex: 40.00"
+                        {...field}
+                        value={field.value ?? ''}
+                        onChange={(e) => {
+                          const v = e.target.value
+                          field.onChange(v === '' ? undefined : Number(v))
+                        }}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Preço de uma ida ou de uma volta, dentro do seu raio de atendimento.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="vehicle_accessible"
+              render={({ field }) => (
+                <FormItem>
+                  <button
+                    type="button"
+                    aria-pressed={Boolean(field.value)}
+                    onClick={() => field.onChange(!field.value)}
+                    className={`w-full text-left rounded-xl border-2 p-4 transition-all ${
+                      field.value ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 font-semibold">
+                      <span
+                        className={`w-4 h-4 rounded grid place-items-center border-2 ${
+                          field.value ? 'bg-primary border-primary text-white' : 'border-muted-foreground/40'
+                        }`}
+                      >
+                        {field.value && <PlusCircle className="w-3 h-3 rotate-45" />}
+                      </span>
+                      Veículo adaptado para cadeirante
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1.5">
+                      Famílias podem filtrar a busca por isso.
+                    </p>
+                  </button>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </CardContent>
+        </Card>
+        )}
+
+        <Card>
+          <CardHeader>
+            <CardTitle>{offersCare ? 'Especialidades e Disponibilidade' : 'Disponibilidade'}</CardTitle>
+            <CardDescription>
+              {offersCare
+                ? 'Defina com o que você sabe lidar e quando pode trabalhar.'
+                : 'Defina quando você pode atender.'}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-8">
+            {offersCare && (
             <FormField
               control={form.control}
               name="specialties"
@@ -226,6 +438,12 @@ export function CaregiverProfileForm({ initialData, verificationStatus }: Caregi
                       return (
                         <Badge
                           key={tag.value}
+                          // render={<button>} mantém o estilo do Badge mas emite um
+                          // <button> real: focável por teclado e anunciado como
+                          // controle de alternância (antes era um <span> com onClick,
+                          // invisível para leitor de tela e inalcançável por Tab).
+                          render={<button type="button" />}
+                          aria-pressed={isSelected}
                           variant={isSelected ? "default" : "outline"}
                           className="cursor-pointer text-sm py-1.5 px-3 transition-all hover:bg-primary/90"
                           onClick={() => toggleTag(field, tag.value)}
@@ -241,6 +459,7 @@ export function CaregiverProfileForm({ initialData, verificationStatus }: Caregi
                 </FormItem>
               )}
             />
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t">
               <FormField
@@ -255,6 +474,8 @@ export function CaregiverProfileForm({ initialData, verificationStatus }: Caregi
                         return (
                           <Badge
                             key={schedule.value}
+                            render={<button type="button" />}
+                            aria-pressed={isSelected}
                             variant={isSelected ? "default" : "secondary"}
                             className={`cursor-pointer text-sm py-1.5 px-3 transition-all ${isSelected ? '' : 'opacity-60'}`}
                             onClick={() => toggleTag(field, schedule.value)}
@@ -281,6 +502,8 @@ export function CaregiverProfileForm({ initialData, verificationStatus }: Caregi
                         return (
                           <Badge
                             key={schedule.value}
+                            render={<button type="button" />}
+                            aria-pressed={isSelected}
                             variant={isSelected ? "default" : "secondary"}
                             className={`cursor-pointer text-sm py-1.5 px-3 transition-all ${isSelected ? '' : 'opacity-60'}`}
                             onClick={() => toggleTag(field, schedule.value)}

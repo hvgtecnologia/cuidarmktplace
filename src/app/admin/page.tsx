@@ -1,35 +1,17 @@
-import { createClient } from '@/lib/supabase/server'
 import { Icons, type IconKey } from '@/components/icons'
+import { getMetrics, EMPTY_METRICS } from '@/server/domain/admin/admin.service'
 
 export const metadata = { title: 'Visão geral · Admin' }
 
-async function getMetrics() {
-  const supabase = createClient()
-  const [{ count: totalCaregivers }, { count: pendingVerifications }, { count: totalFamilies }, { count: totalMatches }, { count: activeBookings }] =
-    await Promise.all([
-      supabase.from('caregiver_profiles').select('*', { count: 'exact', head: true }),
-      supabase.from('caregiver_profiles').select('*', { count: 'exact', head: true }).eq('verification_status', 'pending'),
-      supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'family'),
-      supabase.from('matches').select('*', { count: 'exact', head: true }),
-      supabase.from('bookings').select('*', { count: 'exact', head: true }).in('status', ['confirmed', 'in_progress']),
-    ])
-  return {
-    totalCaregivers: totalCaregivers ?? 0,
-    pendingVerifications: pendingVerifications ?? 0,
-    totalFamilies: totalFamilies ?? 0,
-    totalMatches: totalMatches ?? 0,
-    activeBookings: activeBookings ?? 0,
-  }
-}
+const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 
 export default async function AdminHome() {
-  const metrics = await getMetrics().catch(() => null)
-  const safe = metrics || { totalCaregivers: 0, pendingVerifications: 0, totalFamilies: 0, totalMatches: 0, activeBookings: 0 }
+  const safe = await getMetrics().catch(() => EMPTY_METRICS)
 
   const cards: Array<{ label: string; value: string; sub: string; icon: IconKey; tone: 'primary' | 'secondary' | 'accent' | 'highlight' }> = [
-    { label: 'Cuidadores ativos', value: String(safe.totalCaregivers), sub: '+12% vs mês anterior', icon: 'stethoscope', tone: 'primary' },
+    { label: 'Cuidadores ativos', value: String(safe.totalCaregivers), sub: 'total na base', icon: 'stethoscope', tone: 'primary' },
     { label: 'Verificações pendentes', value: String(safe.pendingVerifications), sub: 'aguardando análise', icon: 'shield', tone: 'highlight' },
-    { label: 'Famílias cadastradas', value: String(safe.totalFamilies), sub: '+24% vs mês anterior', icon: 'handHeart', tone: 'secondary' },
+    { label: 'Famílias cadastradas', value: String(safe.totalFamilies), sub: 'total na base', icon: 'handHeart', tone: 'secondary' },
     { label: 'Convites enviados', value: String(safe.totalMatches), sub: 'todos os tempos', icon: 'sparkles', tone: 'accent' },
     { label: 'Contratos ativos', value: String(safe.activeBookings), sub: 'em execução agora', icon: 'calendar', tone: 'primary' },
   ]
@@ -67,22 +49,24 @@ export default async function AdminHome() {
         <div className="bg-card border border-border rounded-2xl p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold">GMV mensal</h2>
-            <span className="text-xs font-semibold text-secondary bg-secondary/10 px-2 py-0.5 rounded-md">+18.4%</span>
+            <span className="text-xs font-semibold text-muted-foreground bg-muted px-2 py-0.5 rounded-md">
+              {safe.bookingCount} {safe.bookingCount === 1 ? 'contrato' : 'contratos'}
+            </span>
           </div>
-          <div className="text-4xl font-bold tracking-tight gradient-text">R$ 284.500</div>
+          <div className="text-4xl font-bold tracking-tight gradient-text">{BRL.format(safe.gmvCents / 100)}</div>
           <p className="mt-1 text-sm text-muted-foreground">Volume total de transações no mês</p>
           <div className="mt-6 grid grid-cols-3 gap-4 text-center">
             <div>
               <div className="text-xs text-muted-foreground">Take rate</div>
-              <div className="text-lg font-bold mt-1">15%</div>
+              <div className="text-lg font-bold mt-1">{safe.takeRatePct}%</div>
             </div>
             <div>
               <div className="text-xs text-muted-foreground">Receita</div>
-              <div className="text-lg font-bold mt-1">R$ 42.6k</div>
+              <div className="text-lg font-bold mt-1">{BRL.format(safe.feeCents / 100)}</div>
             </div>
             <div>
               <div className="text-xs text-muted-foreground">Ticket médio</div>
-              <div className="text-lg font-bold mt-1">R$ 3.2k</div>
+              <div className="text-lg font-bold mt-1">{BRL.format(safe.avgTicketCents / 100)}</div>
             </div>
           </div>
         </div>
@@ -100,15 +84,15 @@ export default async function AdminHome() {
             <li className="flex items-start gap-3 text-sm">
               <span className="w-2 h-2 rounded-full bg-primary mt-2 flex-shrink-0" />
               <div>
-                <div className="font-semibold">3 disputas abertas</div>
+                <div className="font-semibold">{safe.openDisputes} disputas abertas</div>
                 <div className="text-xs text-muted-foreground">Mediação família-cuidador</div>
               </div>
             </li>
             <li className="flex items-start gap-3 text-sm">
               <span className="w-2 h-2 rounded-full bg-secondary mt-2 flex-shrink-0" />
               <div>
-                <div className="font-semibold">12 saques solicitados</div>
-                <div className="text-xs text-muted-foreground">Liberação de pagamentos a cuidadores</div>
+                <div className="font-semibold">{safe.activeBookings} contratos em execução</div>
+                <div className="text-xs text-muted-foreground">Plantões confirmados ou em andamento</div>
               </div>
             </li>
           </ul>

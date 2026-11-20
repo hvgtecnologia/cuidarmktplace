@@ -129,3 +129,32 @@ export const SCHEDULES = [
 export type CaregiverLevel = typeof CAREGIVER_LEVELS[number]['value']
 export type ServiceModality = typeof SERVICE_MODALITIES[number]['value']
 export type ServiceCategory = typeof SERVICE_CATEGORIES[number]['value']
+
+/**
+ * Funções que um profissional pode oferecer. Um perfil pode ter mais de uma:
+ * a mesma pessoa pode cuidar e dirigir.
+ *
+ * Os valores batem com a coluna caregiver_profiles.services (text[]).
+ */
+export const PROFESSIONAL_SERVICES = [
+  {
+    value: 'care',
+    label: 'Cuidados',
+    description: 'Acompanhamento, higiene, medicação e rotina do idoso.',
+  },
+  {
+    value: 'driving',
+    label: 'Transporte',
+    description: 'Levar e buscar em consultas, exames e compromissos.',
+  },
+] as const
+
+export type ProfessionalService = typeof PROFESSIONAL_SERVICES[number]['value']
+
+export const DRIVER_LICENSE_CATEGORIES = [
+  { value: 'B', label: 'B — carro' },
+  { value: 'AB', label: 'AB — carro e moto' },
+  { value: 'C', label: 'C — carga' },
+  { value: 'D', label: 'D — transporte de passageiros' },
+  { value: 'E', label: 'E — combinação de veículos' },
+] as const

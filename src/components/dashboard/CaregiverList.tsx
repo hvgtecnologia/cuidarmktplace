@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useCallback, useTransition } from 'react'
 import Link from 'next/link'
-import { searchCaregiversAction } from '@/app/family/dashboard/actions'
+import { searchCaregiversAction } from '@/server/actions/caregiver.actions'
+import { InviteDialog, type ElderlyOption } from '@/components/matches/InviteDialog'
 import {
   CARE_TAGS,
   CAREGIVER_LEVELS,
   SERVICE_MODALITIES,
+  PROFESSIONAL_SERVICES,
 } from '@/constants/care-tags'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -23,7 +25,7 @@ import {
 import { Icons } from '@/components/icons'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import type { CaregiverSearchFilters } from '@/lib/validations/search'
+import type { CaregiverSearchFilters } from '@/server/validations/search'
 
 type CaregiverResult = {
   id: string
@@ -48,6 +50,13 @@ type CaregiverResult = {
   rating_average: number
   rating_count: number
   jobs_completed?: number
+  services?: string[]
+  vehicle_model?: string | null
+  vehicle_year?: number | null
+  vehicle_accessible?: boolean
+  driver_license_category?: string | null
+  trip_rate?: number | null
+  service_radius_km?: number | null
   is_pro?: boolean
   is_featured?: boolean
   verification_status?: string
@@ -55,6 +64,8 @@ type CaregiverResult = {
 }
 
 const DEFAULT_FILTERS: CaregiverSearchFilters = {
+  service: '',
+  accessibleVehicle: false,
   specialty: '',
   shift: '',
   level: '',
@@ -88,7 +99,7 @@ function formatBRL(value: number | null | undefined) {
   }).format(value)
 }
 
-export function CaregiverList() {
+export function CaregiverList({ elderly }: { elderly: ElderlyOption[] }) {
   const [caregivers, setCaregivers] = useState<CaregiverResult[]>([])
   const [filters, setFilters] = useState<CaregiverSearchFilters>(DEFAULT_FILTERS)
   const [isPending, startTransition] = useTransition()
@@ -110,18 +121,82 @@ export function CaregiverList() {
     fetchCaregivers(filters)
   }, [filters, fetchCaregivers])
 
-  const handle = (key: keyof CaregiverSearchFilters, value: string | number | null | undefined) => {
-    setFilters((prev) => ({
-      ...prev,
-      [key]: value == null || value === 'all' || value === '' ? (key === 'maxPrice' ? undefined : '') : value,
-    }))
+  const handle = (
+    key: keyof CaregiverSearchFilters,
+    value: string | number | boolean | null | undefined
+  ) => {
+    setFilters((prev) => {
+      // Booleano (veículo adaptado) não passa pela normalização de "vazio".
+      if (typeof value === 'boolean') return { ...prev, [key]: value }
+
+      const normalized =
+        value == null || value === 'all' || value === ''
+          ? (key === 'maxPrice' ? undefined : '')
+          : value
+
+      const next = { ...prev, [key]: normalized }
+      // Trocar de função zera o filtro de veículo, que só vale para transporte.
+      if (key === 'service' && normalized !== 'driving') next.accessibleVehicle = false
+      return next
+    })
   }
 
-  const activeFilters = [filters.specialty, filters.shift, filters.level, filters.modality, filters.city, filters.maxPrice]
+  const activeFilters = [filters.service, filters.specialty, filters.shift, filters.level, filters.modality, filters.city, filters.maxPrice]
     .filter((v) => v !== '' && v !== undefined && v !== null).length
+    + (filters.accessibleVehicle ? 1 : 0)
+
+  const filteringDrivers = filters.service === 'driving'
 
   return (
     <div className="space-y-6">
+      {/* Função desejada — primeira decisão da família, por isso fora dos selects */}
+      <div className="bg-card border border-border rounded-2xl p-4 sm:p-5 shadow-sm">
+        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+          O que você precisa?
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            aria-pressed={!filters.service}
+            onClick={() => handle('service', 'all')}
+            className={`rounded-lg border-2 px-4 py-2 text-sm font-medium transition-all ${
+              !filters.service ? 'border-primary bg-primary/5 text-primary' : 'border-border hover:border-primary/40'
+            }`}
+          >
+            Tudo
+          </button>
+          {PROFESSIONAL_SERVICES.map((service) => (
+            <button
+              key={service.value}
+              type="button"
+              aria-pressed={filters.service === service.value}
+              onClick={() => handle('service', service.value)}
+              className={`rounded-lg border-2 px-4 py-2 text-sm font-medium transition-all ${
+                filters.service === service.value
+                  ? 'border-primary bg-primary/5 text-primary'
+                  : 'border-border hover:border-primary/40'
+              }`}
+            >
+              {service.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Só aparece quando faz sentido: filtrar veículo adaptado sem procurar
+            transporte não quer dizer nada. */}
+        {filteringDrivers && (
+          <label className="mt-3 flex items-center gap-2 text-sm cursor-pointer w-fit">
+            <input
+              type="checkbox"
+              checked={Boolean(filters.accessibleVehicle)}
+              onChange={(e) => handle('accessibleVehicle', e.target.checked)}
+              className="w-4 h-4 rounded border-input accent-[hsl(var(--primary))]"
+            />
+            Somente veículos adaptados para cadeirante
+          </label>
+        )}
+      </div>
+
       {/* Filter bar */}
       <div className="bg-card border border-border rounded-2xl p-4 sm:p-5 shadow-sm">
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 lg:gap-4">
@@ -202,7 +277,7 @@ export function CaregiverList() {
         <EmptyState />
       ) : (
         <div className={cn('grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 transition-opacity', isPending && 'opacity-60')}>
-          {caregivers.map((cg) => <CaregiverCard key={cg.id} cg={cg} />)}
+          {caregivers.map((cg) => <CaregiverCard key={cg.id} cg={cg} elderly={elderly} />)}
         </div>
       )}
     </div>
@@ -261,7 +336,7 @@ function EmptyState() {
   )
 }
 
-function CaregiverCard({ cg }: { cg: CaregiverResult }) {
+function CaregiverCard({ cg, elderly }: { cg: CaregiverResult; elderly: ElderlyOption[] }) {
   const firstName = cg.profiles?.full_name?.split(' ')[0] || 'Cuidador'
 
   // Build pricing summary - prefer most relevant tier
@@ -276,20 +351,6 @@ function CaregiverCard({ cg }: { cg: CaregiverResult }) {
 
   const primaryPrice = priceTiers[0]
   const secondaryPrices = priceTiers.slice(1, 3)
-
-  async function handleInvite() {
-    toast.loading('Enviando convite…', { id: `invite-${cg.id}` })
-    const res = await import('@/app/actions/match').then((m) =>
-      m.inviteCaregiverAction({ caregiverId: cg.user_id })
-    )
-    if (res.success) {
-      toast.success('Convite enviado! Aguarde o retorno.', { id: `invite-${cg.id}` })
-    } else if (res && typeof res === 'object' && 'code' in res && (res as { code?: string }).code === 'SUBSCRIPTION_REQUIRED') {
-      toast.error('Este cuidador exige assinatura Pro para convites.', { id: `invite-${cg.id}` })
-    } else {
-      toast.error(res.error || 'Erro ao enviar convite.', { id: `invite-${cg.id}` })
-    }
-  }
 
   return (
     <Card className="overflow-hidden border-border hover:border-primary/40 hover:shadow-elevated hover:-translate-y-1 transition-all duration-300 group flex flex-col rounded-2xl bg-card">
@@ -351,9 +412,37 @@ function CaregiverCard({ cg }: { cg: CaregiverResult }) {
           )}
         </div>
 
+        {/* Funções oferecidas. Perfis antigos sem a coluna preenchida contam
+            como cuidadores, que era o único serviço que existia antes. */}
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {(cg.services?.length ? cg.services : ['care']).map((sv) => (
+            <Badge
+              key={sv}
+              variant="outline"
+              className="text-[10px] font-semibold border-primary/30 text-primary bg-primary/5"
+            >
+              {PROFESSIONAL_SERVICES.find((p) => p.value === sv)?.label || sv}
+            </Badge>
+          ))}
+          {cg.vehicle_accessible && (
+            <Badge variant="outline" className="text-[10px] font-semibold border-secondary/40 text-secondary bg-secondary/5">
+              Adaptado p/ cadeirante
+            </Badge>
+          )}
+        </div>
+
         <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
           {cg.bio || 'Este profissional ainda não escreveu uma bio.'}
         </p>
+
+        {cg.services?.includes('driving') && cg.vehicle_model && (
+          <div className="mt-2 text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">{cg.vehicle_model}</span>
+            {cg.vehicle_year ? ` · ${cg.vehicle_year}` : ''}
+            {cg.driver_license_category ? ` · CNH ${cg.driver_license_category}` : ''}
+            {cg.service_radius_km ? ` · atende até ${cg.service_radius_km} km` : ''}
+          </div>
+        )}
 
         {/* Specialties */}
         <div className="mt-3 flex flex-wrap gap-1.5">
@@ -368,19 +457,41 @@ function CaregiverCard({ cg }: { cg: CaregiverResult }) {
         </div>
 
         {/* Pricing block */}
-        {primaryPrice && (
+        {/* Aparece também para quem só dirige: esses têm hourly_rate zerado e
+            sem esta condição o valor do trajeto ficaria invisível. */}
+        {(primaryPrice || cg.trip_rate) && (
           <div className="mt-4 bg-muted/40 border border-border/60 rounded-xl p-3">
             <div className="flex items-baseline justify-between">
               <div>
-                <div className="text-xs text-muted-foreground font-medium">A partir de</div>
-                <div className="text-2xl font-bold tracking-tight gradient-text">
-                  {formatBRL(primaryPrice.value)}
-                  <span className="text-xs text-muted-foreground font-medium ml-1">/{primaryPrice.label}</span>
-                </div>
+                {primaryPrice ? (
+                  <>
+                    <div className="text-xs text-muted-foreground font-medium">A partir de</div>
+                    <div className="text-2xl font-bold tracking-tight gradient-text">
+                      {formatBRL(primaryPrice.value)}
+                      <span className="text-xs text-muted-foreground font-medium ml-1">/{primaryPrice.label}</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-xs text-muted-foreground font-medium">Transporte</div>
+                    <div className="text-2xl font-bold tracking-tight gradient-text">
+                      {formatBRL(Number(cg.trip_rate))}
+                      <span className="text-xs text-muted-foreground font-medium ml-1">/trajeto</span>
+                    </div>
+                  </>
+                )}
               </div>
-              {priceTiers.length > 1 && (
+              {cg.trip_rate && primaryPrice ? (
+                <div className="text-right">
+                  <div className="text-xs text-muted-foreground font-medium">Transporte</div>
+                  <div className="text-sm font-bold">
+                    {formatBRL(Number(cg.trip_rate))}
+                    <span className="text-[10px] text-muted-foreground font-medium ml-0.5">/trajeto</span>
+                  </div>
+                </div>
+              ) : priceTiers.length > 1 ? (
                 <span className="text-[10px] text-muted-foreground">+{priceTiers.length - 1} modalidades</span>
-              )}
+              ) : null}
             </div>
             {secondaryPrices.length > 0 && (
               <div className="mt-2 pt-2 border-t border-border/40 flex flex-wrap gap-3 text-[11px] text-muted-foreground">
@@ -399,9 +510,16 @@ function CaregiverCard({ cg }: { cg: CaregiverResult }) {
           <Link href={`/caregiver/${cg.user_id}`}>
             <Button variant="outline" size="sm" className="w-full">Ver perfil</Button>
           </Link>
-          <Button size="sm" onClick={handleInvite} className="shadow-soft">
-            <Icons.heart className="mr-1.5 w-3.5 h-3.5" /> Convidar
-          </Button>
+          <InviteDialog
+            caregiverUserId={cg.user_id}
+            caregiverName={cg.profiles?.full_name || 'Cuidador'}
+            elderly={elderly}
+            trigger={(open) => (
+              <Button size="sm" onClick={open} className="shadow-soft w-full">
+                <Icons.heart className="mr-1.5 w-3.5 h-3.5" /> Convidar
+              </Button>
+            )}
+          />
         </div>
       </CardContent>
     </Card>

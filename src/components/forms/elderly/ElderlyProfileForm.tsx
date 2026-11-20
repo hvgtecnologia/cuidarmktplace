@@ -7,8 +7,8 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { PlusCircle, Info } from 'lucide-react'
 
-import { elderlyProfileSchema, type ElderlyProfileFormValues } from '@/lib/validations/elderly'
-import { createElderlyProfile, updateElderlyProfile } from '@/app/family/elderly/actions'
+import { elderlyProfileSchema, type ElderlyProfileFormValues } from '@/server/validations/elderly'
+import { createElderlyProfile, updateElderlyProfile } from '@/server/actions/elderly.actions'
 import { CARE_TAGS, SCHEDULES } from '@/constants/care-tags'
 
 import { Button } from '@/components/ui/button'
@@ -228,6 +228,10 @@ export function ElderlyProfileForm({ initialData, elderlyId }: ElderlyProfileFor
                       return (
                         <Badge
                           key={tag.value}
+                          // <button> real em vez de <span> com onClick: focável por
+                          // teclado e anunciado como controle de alternância.
+                          render={<button type="button" />}
+                          aria-pressed={isSelected}
                           variant={isSelected ? "default" : "outline"}
                           className="cursor-pointer text-sm py-1.5 px-3 transition-all hover:bg-primary/90"
                           onClick={() => toggleTag(field, tag.value)}
@@ -256,6 +260,8 @@ export function ElderlyProfileForm({ initialData, elderlyId }: ElderlyProfileFor
                       return (
                         <Badge
                           key={schedule.value}
+                          render={<button type="button" />}
+                          aria-pressed={isSelected}
                           variant={isSelected ? "default" : "outline"}
                           className="cursor-pointer text-sm py-1.5 px-3 transition-all"
                           onClick={() => toggleTag(field, schedule.value)}

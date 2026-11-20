@@ -1,30 +1,17 @@
-import { createClient } from '@/lib/supabase/server'
+import * as profiles from '@/server/domain/profiles/profiles.repository'
+import * as elderly from '@/server/domain/elderly/elderly.repository'
 import { Badge } from '@/components/ui/badge'
 import { Icons } from '@/components/icons'
 
 export const metadata = { title: 'Famílias · Admin' }
 
 export default async function AdminFamiliesPage() {
-  const supabase = createClient()
+  const [families, elderlyByFamily] = await Promise.all([
+    profiles.findFamiliesForAdmin(),
+    elderly.countsByFamily(),
+  ])
 
-  const { data: families } = await supabase
-    .from('profiles')
-    .select('id, full_name, avatar_url, phone, is_active, created_at')
-    .eq('role', 'family')
-    .order('created_at', { ascending: false })
-    .limit(100)
-
-  const items = families || []
-
-  // Counts of elderly profiles per family
-  const { data: elderly } = await supabase
-    .from('elderly_profiles')
-    .select('family_id')
-
-  const elderlyByFamily = new Map<string, number>()
-  for (const row of (elderly || [])) {
-    elderlyByFamily.set(row.family_id, (elderlyByFamily.get(row.family_id) || 0) + 1)
-  }
+  const items = families ?? []
 
   return (
     <div className="p-8 lg:p-10 max-w-7xl mx-auto">

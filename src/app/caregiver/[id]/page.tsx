@@ -1,8 +1,10 @@
-import { createClient } from '@/lib/supabase/server'
-import { notFound, redirect } from 'next/navigation'
+import { requireUser } from '@/server/http/guards'
+import * as caregiverRepo from '@/server/domain/caregivers/caregivers.repository'
+import * as reviews_repo from '@/server/domain/reviews/reviews.repository'
+import * as elderlyRepo from '@/server/domain/elderly/elderly.repository'
+import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Icons, type IconKey } from '@/components/icons'
 import { InvitePanel } from './InviteButton'
@@ -40,62 +42,32 @@ const LEVEL_LABEL: Record<string, string> = {
 }
 
 export default async function PublicCaregiverProfile({ params }: { params: { id: string } }) {
-  const supabase = createClient()
+  // Perfil PÚBLICO: a família precisa abrir antes de convidar, e o admin
+  // acessa pela fila de verificação. Só exige sessão, não um role específico.
+  const viewer = await requireUser()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  // params.id é o user_id vindo do link do card em CaregiverList
+  const caregiver = await caregiverRepo.findFullPublicProfile(params.id)
+  if (!caregiver) notFound()
 
-  // params.id is the user_id from CaregiverList card link
-  const { data: caregiver, error } = await supabase
-    .from('caregiver_profiles')
-    .select(`
-      id,
-      user_id,
-      bio,
-      level,
-      years_experience,
-      specialties,
-      certifications,
-      coren_number,
-      hourly_rate,
-      half_day_rate,
-      day_shift_rate,
-      night_shift_rate,
-      overnight_rate,
-      full_24h_rate,
-      monthly_rate,
-      offered_modalities,
-      available_days,
-      available_shifts,
-      service_radius_km,
-      city,
-      neighborhood,
-      state,
-      rating_average,
-      rating_count,
-      jobs_completed,
-      verification_status,
-      verified_at,
-      is_pro,
-      is_featured,
-      profiles:user_id (full_name, avatar_url, is_active, phone)
-    `)
-    .eq('user_id', params.id)
-    .single()
-
-  if (error || !caregiver) notFound()
-
-  // Supabase relation can come as object or array depending on FK config
+  // A relação do Supabase vem como objeto ou array dependendo da FK
   const profile = Array.isArray(caregiver.profiles) ? caregiver.profiles[0] : caregiver.profiles
   if (!profile?.is_active) notFound()
 
-  // Reviews recentes
-  const { data: reviews } = await supabase
-    .from('reviews')
-    .select('id, rating, comment, created_at, reviewer:reviewer_id (full_name, avatar_url)')
-    .eq('caregiver_id', caregiver.user_id)
-    .order('created_at', { ascending: false })
-    .limit(6)
+  // View sem identidade: nota, comentário e data. Quem escreveu não vem.
+  const reviews = await reviews_repo.findPublicByCaregiver(caregiver.user_id, 6)
+
+  // Fichas da família, para escolher no convite. Cuidador/admin visitando o
+  // perfil não têm nenhuma — e o botão de convite não serve a eles mesmo.
+  const elderly =
+    viewer.role === 'family'
+      ? (await elderlyRepo.findByFamily(viewer.id)).map((e) => ({
+          id: e.id as string,
+          name: e.name as string,
+          neighborhood: (e.neighborhood as string) ?? null,
+          city: (e.city as string) ?? null,
+        }))
+      : []
 
   const firstName = profile.full_name?.split(' ')[0] || 'Cuidador'
   const levelLabel = LEVEL_LABEL[caregiver.level] || 'Cuidador'
@@ -179,7 +151,7 @@ export default async function PublicCaregiverProfile({ params }: { params: { id:
             </div>
 
             <div className="hidden md:flex flex-col items-end">
-              <InvitePanel caregiverUserId={caregiver.user_id} caregiverName={profile.full_name} />
+              <InvitePanel caregiverUserId={caregiver.user_id} caregiverName={profile.full_name} elderly={elderly} />
             </div>
           </div>
         </div>
@@ -291,37 +263,36 @@ export default async function PublicCaregiverProfile({ params }: { params: { id:
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {reviews.map((r) => {
-                      const reviewer = Array.isArray(r.reviewer) ? r.reviewer[0] : r.reviewer
-                      return (
-                        <div key={r.id} className="border border-border rounded-xl p-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-full bg-muted overflow-hidden flex-shrink-0">
-                              {reviewer?.avatar_url ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={reviewer.avatar_url} alt="" className="w-full h-full object-cover" />
-                              ) : (
-                                <div className="w-full h-full grid place-items-center text-sm font-bold text-muted-foreground">
-                                  {reviewer?.full_name?.charAt(0).toUpperCase() || '?'}
-                                </div>
-                              )}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="text-sm font-semibold truncate">{reviewer?.full_name || 'Família'}</div>
-                              <div className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleDateString('pt-BR')}</div>
-                            </div>
-                            <div className="flex gap-0.5 text-highlight flex-shrink-0">
-                              {Array.from({ length: r.rating }).map((_, i) => (
-                                <Icons.star key={i} className="w-3.5 h-3.5 fill-current" />
-                              ))}
-                            </div>
+                    {reviews.map((r) => (
+                      <div key={r.id} className="border border-border rounded-xl p-4">
+                        <div className="flex items-center gap-3">
+                          {/* Anônimo por construção: a view não traz quem escreveu. */}
+                          <div className="w-9 h-9 rounded-full bg-muted grid place-items-center flex-shrink-0 text-muted-foreground">
+                            <Icons.users className="w-4 h-4" />
                           </div>
-                          {r.comment && (
-                            <p className="mt-3 text-sm text-foreground/80 leading-relaxed">&ldquo;{r.comment}&rdquo;</p>
-                          )}
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-semibold flex items-center gap-1.5">
+                              Família atendida
+                              <span
+                                title="Só quem teve atendimento aceito com este profissional pode avaliar"
+                                className="inline-flex items-center gap-0.5 text-[10px] font-medium text-secondary"
+                              >
+                                <Icons.verified className="w-3 h-3" /> verificada
+                              </span>
+                            </div>
+                            <div className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleDateString('pt-BR')}</div>
+                          </div>
+                          <div className="flex gap-0.5 text-highlight flex-shrink-0">
+                            {Array.from({ length: r.rating }).map((_, i) => (
+                              <Icons.star key={i} className="w-3.5 h-3.5 fill-current" />
+                            ))}
+                          </div>
                         </div>
-                      )
-                    })}
+                        {r.comment && (
+                          <p className="mt-3 text-sm text-foreground/80 leading-relaxed">&ldquo;{r.comment}&rdquo;</p>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
               </CardContent>
@@ -331,7 +302,7 @@ export default async function PublicCaregiverProfile({ params }: { params: { id:
           {/* Sidebar */}
           <aside className="space-y-6">
             <div className="md:hidden">
-              <InvitePanel caregiverUserId={caregiver.user_id} caregiverName={profile.full_name} />
+              <InvitePanel caregiverUserId={caregiver.user_id} caregiverName={profile.full_name} elderly={elderly} />
             </div>
 
             {/* Availability */}

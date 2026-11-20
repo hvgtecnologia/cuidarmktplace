@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import * as bookings from '@/server/domain/admin/bookings.repository'
 import { Badge } from '@/components/ui/badge'
 
 export const metadata = { title: 'Contratos · Admin' }
@@ -36,19 +36,7 @@ function brl(cents: number) {
 }
 
 export default async function AdminBookingsPage() {
-  const supabase = createClient()
-
-  const { data: bookings } = await supabase
-    .from('bookings')
-    .select(`
-      id, modality, start_at, end_at, hours, rate, total_cents, platform_fee_cents, status, created_at,
-      family:profiles!bookings_family_id_fkey(full_name),
-      caregiver:profiles!bookings_caregiver_id_fkey(full_name)
-    `)
-    .order('start_at', { ascending: false })
-    .limit(100)
-
-  const items = bookings || []
+  const items = (await bookings.findAllForAdmin(100)) ?? []
   const totalGmv = items.reduce((s, b) => s + ((b as { total_cents?: number }).total_cents || 0), 0)
   const totalFee = items.reduce((s, b) => s + ((b as { platform_fee_cents?: number }).platform_fee_cents || 0), 0)
 
@@ -68,7 +56,11 @@ export default async function AdminBookingsPage() {
         <div className="bg-card border border-border rounded-2xl p-5">
           <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Receita Cuide+</div>
           <div className="text-3xl font-bold mt-2 text-secondary">{brl(totalFee)}</div>
-          <div className="text-xs text-muted-foreground mt-0.5">15% take rate</div>
+          {/* Take rate calculado, não fixo: o rótulo dizia 15% enquanto a taxa
+              real somada dos bookings era 13%. */}
+          <div className="text-xs text-muted-foreground mt-0.5">
+            {totalGmv > 0 ? Math.round((totalFee / totalGmv) * 100) : 0}% take rate
+          </div>
         </div>
         <div className="bg-card border border-border rounded-2xl p-5">
           <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ticket médio</div>

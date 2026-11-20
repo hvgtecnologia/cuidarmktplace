@@ -7,10 +7,19 @@ const useLocalCache = existsSync(LOCAL_NODE_MODULES_CACHE)
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Não trave o build da Vercel por warnings cosméticos.
-  // Em CI/local você ainda roda `npm run lint` separadamente.
+  // O lint RODA no build de propósito. O .eslintrc.json carrega as regras de
+  // fronteira (UI não importa banco; camada de servidor não importa UI) — se
+  // o build as ignorasse, a arquitetura seria só sugestão.
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false,
+  },
+  experimental: {
+    serverActions: {
+      // Upload de avatar vai por server action (FormData com File). O padrão
+      // do Next é 1MB, que barra foto de celular. O limite real é validado
+      // também no action e no cliente.
+      bodySizeLimit: '5mb',
+    },
   },
   images: {
     remotePatterns: [

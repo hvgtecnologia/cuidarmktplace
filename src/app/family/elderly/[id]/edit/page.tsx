@@ -1,7 +1,8 @@
-import { createClient } from '@/lib/supabase/server'
+import { requireRole } from '@/server/http/guards'
+import * as elderly from '@/server/domain/elderly/elderly.repository'
 import { redirect } from 'next/navigation'
 import { ElderlyProfileForm } from '@/components/forms/elderly/ElderlyProfileForm'
-import type { ElderlyProfileFormValues } from '@/lib/validations/elderly'
+import type { ElderlyProfileFormValues } from '@/server/validations/elderly'
 
 export const metadata = {
   title: 'Editar Perfil de Idoso | Cuide+',
@@ -9,25 +10,13 @@ export const metadata = {
 }
 
 export default async function EditElderlyPage({ params }: { params: { id: string } }) {
-  const supabase = createClient()
-  
-  // Security Checks
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    redirect('/login')
-  }
+  // O layout de /family já garantiu sessão + role 'family'.
+  const user = await requireRole(['family'])
 
-  // Load elderly profile. RLS prevents fetching profiles that don't belong to the user
-  const { data: profile, error } = await supabase
-    .from('elderly_profiles')
-    .select('*')
-    .eq('id', params.id)
-    .single()
-
-  if (error || !profile) {
-    // Return unauthorized / not found gracefully
-    redirect('/family/dashboard')
-  }
+  // findOwnedById filtra por family_id além do RLS: a intenção fica explícita
+  // no código, não só na policy.
+  const profile = await elderly.findOwnedById(params.id, user.id)
+  if (!profile) redirect('/family/dashboard')
 
   // Prepare initial data mapping precisely to the form schema types
   const initialData: Partial<ElderlyProfileFormValues> = {

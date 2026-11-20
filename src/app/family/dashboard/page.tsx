@@ -1,10 +1,11 @@
-import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { CaregiverList } from '@/components/dashboard/CaregiverList'
 import { Icons } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { UserMenu } from '@/components/site/user-menu'
+import { requireRole } from '@/server/http/guards'
+import * as profiles from '@/server/domain/profiles/profiles.repository'
+import * as elderlyRepo from '@/server/domain/elderly/elderly.repository'
 
 export const metadata = {
   title: 'Encontre cuidadores',
@@ -12,16 +13,21 @@ export const metadata = {
 }
 
 export default async function FamilyDashboardPage() {
-  const supabase = createClient()
+  // O layout de /family já garantiu sessão + role 'family'.
+  const user = await requireRole(['family'])
+  const [familyObj, elderlyRows] = await Promise.all([
+    profiles.findById(user.id),
+    elderlyRepo.findByFamily(user.id),
+  ])
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const { data: familyObj } = await supabase
-    .from('profiles')
-    .select('full_name, avatar_url')
-    .eq('id', user.id)
-    .single()
+  // Passadas ao convite: é a ficha escolhida que define bairro, serviço e sexo
+  // mostrados ao cuidador. Só os campos da escolha — a ficha completa fica aqui.
+  const elderly = (elderlyRows ?? []).map((e) => ({
+    id: e.id as string,
+    name: e.name as string,
+    neighborhood: (e.neighborhood as string) ?? null,
+    city: (e.city as string) ?? null,
+  }))
 
   const firstName = familyObj?.full_name?.split(' ')[0] || 'Família'
 
@@ -38,10 +44,25 @@ export default async function FamilyDashboardPage() {
               Cuide<span className="text-primary">+</span>
             </span>
           </Link>
-          <nav className="hidden sm:flex items-center gap-1">
-            <Link href="/family/dashboard"><Button variant="ghost" size="sm">Buscar</Button></Link>
-            <Link href="/family/dashboard/matches"><Button variant="ghost" size="sm">Meus convites</Button></Link>
-            <Link href="/family/elderly/new"><Button variant="ghost" size="sm">Cadastrar idoso</Button></Link>
+          <nav className="flex items-center gap-1">
+            <Link href="/family/dashboard">
+              <Button variant="ghost" size="sm" className="gap-1.5 px-2 sm:px-3">
+                <Icons.search className="w-4 h-4" />
+                <span className="hidden sm:inline">Buscar</span>
+              </Button>
+            </Link>
+            <Link href="/family/dashboard/matches">
+              <Button variant="ghost" size="sm" className="gap-1.5 px-2 sm:px-3">
+                <Icons.chat className="w-4 h-4" />
+                <span className="hidden sm:inline">Meus convites</span>
+              </Button>
+            </Link>
+            <Link href="/family/elderly/new">
+              <Button variant="ghost" size="sm" className="gap-1.5 px-2 sm:px-3">
+                <Icons.handHeart className="w-4 h-4" />
+                <span className="hidden sm:inline">Cadastrar idoso</span>
+              </Button>
+            </Link>
           </nav>
           <div className="flex items-center gap-2">
             <button className="w-9 h-9 grid place-items-center rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" aria-label="Notificações">
@@ -68,7 +89,7 @@ export default async function FamilyDashboardPage() {
           </p>
         </div>
 
-        <CaregiverList />
+        <CaregiverList elderly={elderly} />
       </main>
     </div>
   )

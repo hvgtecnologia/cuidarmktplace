@@ -1,6 +1,7 @@
-import { createClient } from '@/lib/supabase/server'
+import * as caregiverRepo from '@/server/domain/caregivers/caregivers.repository'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
+import { VerificationMethodCell } from '@/components/admin/VerificationMethodCell'
 import { Button } from '@/components/ui/button'
 import { Icons } from '@/components/icons'
 
@@ -28,19 +29,7 @@ const LEVEL_LABEL: Record<string, string> = {
 }
 
 export default async function AdminCaregiversPage() {
-  const supabase = createClient()
-
-  const { data: caregivers } = await supabase
-    .from('caregiver_profiles')
-    .select(`
-      id, user_id, level, hourly_rate, city, state, rating_average, rating_count,
-      jobs_completed, verification_status, is_pro, is_featured, created_at,
-      profiles:user_id (full_name, avatar_url, phone)
-    `)
-    .order('created_at', { ascending: false })
-    .limit(50)
-
-  const items = caregivers || []
+  const items = (await caregiverRepo.findAllForAdmin(50)) ?? []
   const byStatus = {
     approved: items.filter((c) => c.verification_status === 'approved').length,
     pending: items.filter((c) => c.verification_status === 'pending').length,
@@ -84,6 +73,7 @@ export default async function AdminCaregiversPage() {
               <th className="text-right px-5 py-3">Hora</th>
               <th className="text-center px-5 py-3">Rating</th>
               <th className="text-center px-5 py-3">Status</th>
+              <th className="text-center px-5 py-3">Verificação</th>
               <th className="px-5 py-3"></th>
             </tr>
           </thead>
@@ -129,6 +119,14 @@ export default async function AdminCaregiversPage() {
                     <Badge variant="outline" className={`text-xs ${STATUS_BADGE[c.verification_status] || ''}`}>
                       {STATUS_LABEL[c.verification_status] || c.verification_status}
                     </Badge>
+                  </td>
+                  <td className="px-5 py-4">
+                    <VerificationMethodCell
+                      caregiverUserId={c.user_id}
+                      status={c.verification_status}
+                      method={c.verification_method as 'online' | 'in_person' | null}
+                      setAt={c.verification_method_at as string | null}
+                    />
                   </td>
                   <td className="px-5 py-4 text-right">
                     <Link href={`/caregiver/${c.user_id}`}>

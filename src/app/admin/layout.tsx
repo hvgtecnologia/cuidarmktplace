@@ -1,6 +1,5 @@
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { requireRole } from '@/server/http/guards'
 import { Icons } from '@/components/icons'
 import { UserMenu } from '@/components/site/user-menu'
 
@@ -15,24 +14,16 @@ const NAV = [
 ]
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role, full_name, avatar_url')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role !== 'admin') {
-    redirect('/family/dashboard')
-  }
+  // requireRole manda o não-admin para o PRÓPRIO dashboard. Antes isto
+  // redirecionava todo mundo para /family/dashboard, então um cuidador caía
+  // na tela de busca de cuidadores da família.
+  const profile = await requireRole(['admin'])
+  const user = { email: profile.email }
 
   return (
     <div className="min-h-screen bg-muted/20 flex">
       {/* Sidebar */}
-      <aside className="w-64 bg-card border-r border-border flex flex-col">
+      <aside className="hidden lg:flex w-64 bg-card border-r border-border flex-col">
         <div className="p-6 border-b border-border">
           <Link href="/" className="flex items-center gap-2">
             <span className="grid place-items-center w-9 h-9 rounded-xl gradient-primary text-white">
@@ -62,11 +53,15 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         </nav>
 
         <div className="p-3 border-t border-border">
+          {/* A sidebar logo acima já lista Visão geral, Cuidadores, Famílias,
+              Contratos, Pagamentos, Avaliações e Verificação — repetir isso no
+              menu seria duplicata. Aqui só conta e logout. */}
           <UserMenu
             fullName={profile?.full_name || 'Admin'}
             avatarUrl={profile?.avatar_url}
             email={user.email}
             role="admin"
+            showNavigation={false}
           />
         </div>
       </aside>

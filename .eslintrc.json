@@ -1,3 +1,71 @@
 {
-  "extends": ["next/core-web-vitals", "next/typescript"]
+  "extends": [
+    "next/core-web-vitals",
+    "next/typescript"
+  ],
+  "rules": {},
+  "overrides": [
+    {
+      "files": [
+        "src/components/**/*.{ts,tsx}"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "@supabase/supabase-js",
+                "message": "UI não acessa o banco. Receba os dados por props de um Server Component, ou chame um server action de @/server/actions/."
+              },
+              {
+                "name": "@supabase/ssr",
+                "message": "UI não acessa o banco. Receba os dados por props de um Server Component, ou chame um server action de @/server/actions/."
+              }
+            ],
+            "patterns": [
+              {
+                "group": [
+                  "@/server/db/*",
+                  "@/server/domain/*"
+                ],
+                "message": "UI não importa repositório nem serviço. Só @/server/actions/* (server actions) é permitido a partir de componentes."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/server/**/*.ts"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "react",
+                "message": "A camada de servidor não depende de React."
+              },
+              {
+                "name": "react-dom",
+                "message": "A camada de servidor não depende de React."
+              }
+            ],
+            "patterns": [
+              {
+                "group": [
+                  "@/components/*",
+                  "@/app/*"
+                ],
+                "message": "A camada de servidor não importa UI nem páginas. A dependência vai no sentido contrário: app/ e components/ importam de server/."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
 }

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import * as payments from '@/server/domain/payments/payments.repository'
 import { Badge } from '@/components/ui/badge'
 import { Icons } from '@/components/icons'
 
@@ -16,15 +16,7 @@ function brl(cents: number) {
 }
 
 export default async function AdminPaymentsPage() {
-  const supabase = createClient()
-
-  const { data: payments } = await supabase
-    .from('payments')
-    .select('id, amount_cents, currency, status, description, paid_at, created_at, user:profiles!payments_user_id_fkey(full_name, role)')
-    .order('created_at', { ascending: false })
-    .limit(100)
-
-  const items = payments || []
+  const items = (await payments.findAllForAdmin(100)) ?? []
   const stats = {
     paid: items.filter((p) => p.status === 'paid').reduce((s, p) => s + (p.amount_cents || 0), 0),
     pending: items.filter((p) => p.status === 'pending').reduce((s, p) => s + (p.amount_cents || 0), 0),

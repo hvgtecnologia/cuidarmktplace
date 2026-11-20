@@ -1,8 +1,11 @@
-import { createClient } from '@/lib/supabase/server'
+import * as caregiverRepo from '@/server/domain/caregivers/caregivers.repository'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Icons } from '@/components/icons'
+import { VerificationActions } from './VerificationActions'
+import { DocumentReviewList } from '@/components/admin/DocumentReviewList'
+import * as documentsRepo from '@/server/domain/caregivers/documents.repository'
 
 export const metadata = { title: 'Verificação · Admin' }
 
@@ -14,19 +17,15 @@ const LEVEL_LABEL: Record<string, string> = {
 }
 
 export default async function AdminVerificationPage() {
-  const supabase = createClient()
+  const items = (await caregiverRepo.findPendingVerification()) ?? []
 
-  const { data: pending } = await supabase
-    .from('caregiver_profiles')
-    .select(`
-      id, user_id, level, coren_number, years_experience, certifications, created_at, verification_status,
-      profiles:user_id (full_name, avatar_url, phone)
-    `)
-    .in('verification_status', ['pending', 'in_review'])
-    .order('created_at', { ascending: true })
-    .limit(50)
-
-  const items = pending || []
+  // Documentos de cada um na fila. A policy de admin já exclui os vencidos,
+  // então o que não aparecer aqui é porque passou dos 7 dias (ou nunca veio).
+  const docsByCaregiver = new Map(
+    await Promise.all(
+      items.map(async (c) => [c.user_id, await documentsRepo.findForReview(c.user_id)] as const)
+    )
+  )
 
   return (
     <div className="p-8 lg:p-10 max-w-5xl mx-auto">
@@ -98,12 +97,11 @@ export default async function AdminVerificationPage() {
                     <Link href={`/caregiver/${c.user_id}`}>
                       <Button variant="outline" className="w-full">Ver perfil</Button>
                     </Link>
-                    <Button className="w-full bg-emerald-600 hover:bg-emerald-700">
-                      <Icons.check className="w-4 h-4 mr-1.5" /> Aprovar
-                    </Button>
-                    <Button variant="outline" className="w-full text-destructive border-destructive/30 hover:bg-destructive/10">
-                      Recusar
-                    </Button>
+                    <VerificationActions
+                      caregiverUserId={c.user_id}
+                      caregiverName={prof?.full_name || 'Cuidador'}
+                    />
+                    <DocumentReviewList documents={docsByCaregiver.get(c.user_id) ?? []} />
                   </div>
                 </div>
               </div>
